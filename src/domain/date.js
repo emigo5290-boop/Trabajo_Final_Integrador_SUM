@@ -28,8 +28,7 @@ export const deISO = (s) => {
   const [y, m, d] = s.slice(0, 10).split("-").map(Number);
   return new Date(y, m - 1, d);
 };
-export const ahoraLocal = () => {
-  const d = new Date();
+export const ahoraLocal = (d = new Date()) => {
   return `${iso(d)}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
 };
 export const fechaLarga = (s) => {

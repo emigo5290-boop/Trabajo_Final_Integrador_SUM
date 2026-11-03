@@ -4,6 +4,7 @@ import { useRoute } from "vue-router";
 import { useApp } from "../application/context.js";
 import { sortReservations } from "../domain/availability.js";
 import { fechaCorta } from "../domain/date.js";
+import { reservationTransitions } from "../domain/reservation-state.js";
 import StatusBadge from "../components/StatusBadge.vue";
 import ReservationDetail from "../components/ReservationDetail.vue";
 import AppModal from "../components/AppModal.vue";
@@ -38,6 +39,45 @@ const selected = computed(() =>
 const approvedCount = computed(
   () => app.reservations.value.filter((r) => r.estado === "aprobada").length,
 );
+const actions = {
+  aprobada: { label: "Aprobar", class: "btn-primary" },
+  rechazada: {
+    label: "Rechazar",
+    class: "btn-peligro",
+    confirmation: "Rechazar solicitud",
+  },
+  cancelada: {
+    label: "Cancelar",
+    class: "btn-peligro",
+    confirmation: "Cancelar reserva",
+  },
+};
+function availableActions(reservation) {
+  // La pantalla de solicitudes mantiene las acciones de aprobar o rechazar.
+  return reservationTransitions(reservation)
+    .filter((state) => !props.requests || state !== "cancelada")
+    .map((state) => ({
+      ...actions[state],
+      state,
+      label:
+        state === "aprobada" && reservation.estado === "rechazada"
+          ? "Volver a aceptar"
+          : actions[state].label,
+    }));
+}
+function selectAction(r, action) {
+  error.value = "";
+  if (action.confirmation) {
+    pending.value = {
+      r,
+      state: action.state,
+      label: action.confirmation,
+      reason: "",
+    };
+  } else {
+    decide(r.id, action.state);
+  }
+}
 function confirmDecision() {
   if (!pending.value.all) {
     decide(pending.value.r.id, pending.value.state, pending.value.reason);
@@ -118,41 +158,16 @@ function decide(id, value, reason = "") {
         <button class="btn btn-sec btn-chico" @click="selectedId = r.id">
           Ver solicitud y nota</button
         ><button class="btn btn-sec btn-chico" @click="app.pdf.note(r)">
-          Descargar PDF</button
-        ><template v-if="r.estado === 'pendiente'"
-          ><button
-            class="btn btn-primary btn-chico"
-            @click="decide(r.id, 'aprobada')"
-          >
-            Aprobar</button
-          ><button
-            class="btn btn-peligro btn-chico"
-            @click="
-              pending = { r, state: 'rechazada', label: 'Rechazar solicitud' }
-            "
-          >
-            Rechazar
-          </button></template
-        ><button
-          v-if="!requests && r.estado === 'rechazada'"
-          class="btn btn-primary btn-chico"
-          @click="decide(r.id, 'aprobada')"
-        >
-          Volver a aceptar
+          Descargar PDF
         </button>
         <button
-          v-if="!requests && r.estado === 'aprobada'"
-          class="btn btn-peligro btn-chico"
-          @click="
-            pending = {
-              r,
-              state: 'cancelada',
-              label: 'Cancelar reserva',
-              reason: '',
-            }
-          "
+          v-for="action in availableActions(r)"
+          :key="action.state"
+          class="btn btn-chico"
+          :class="action.class"
+          @click="selectAction(r, action)"
         >
-          Cancelar
+          {{ action.label }}
         </button>
       </div>
     </article>

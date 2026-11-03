@@ -38,6 +38,7 @@ const user = {
   cuil: "27123456789",
   email: "ana@ejemplo.com",
   verificado: true,
+  dniImagen: "data:image/png;base64,aGVsbG8=",
 };
 function bookings() {
   const repository = memory();
@@ -120,10 +121,63 @@ test("aprobación revalida el horario y estados finales no se reabren", () => {
   b.role("admin");
   b.service.decide(r.id, "aprobada");
   assert.throws(() => b.service.decide("other", "aprobada"), /superpone/);
-  b.service.decide(r.id, "cancelada");
+  assert.throws(() => b.service.decide(r.id, "cancelada"), /motivo/);
+  assert.throws(() => b.service.decide(r.id, "cancelada", "   "), /motivo/);
+  assert.equal(b.service.list().find((x) => x.id === r.id).estado, "aprobada");
+  b.service.decide(r.id, "cancelada", "  Mantenimiento del SUM  ");
+  assert.equal(
+    b.service.list().find((x) => x.id === r.id).motivoCancelacion,
+    "Mantenimiento del SUM",
+  );
   assert.throws(() => b.service.decide(r.id, "aprobada"), /estado/);
   b.service.decide("other", "aprobada");
 });
+test("una rechazada se puede aceptar si el horario sigue disponible", () => {
+  const b = bookings(),
+    r = b.service.request(form);
+  b.role("admin");
+  b.service.decide(r.id, "rechazada");
+  b.repository.write("reservas", [
+    ...b.service.list(),
+    { ...r, id: "other", estado: "aprobada" },
+  ]);
+  assert.throws(() => b.service.decide(r.id, "aprobada"), /superpone/);
+  assert.equal(b.service.list().find((x) => x.id === r.id).estado, "rechazada");
+  b.service.decide("other", "cancelada", "Cambio de horario");
+  b.service.decide(r.id, "aprobada");
+  assert.equal(b.service.list().find((x) => x.id === r.id).estado, "aprobada");
+});
+
+test("cancelar todas exige admin y motivo y conserva las solicitudes sin aprobar", () => {
+  const b = bookings(),
+    r = b.service.request(form);
+  assert.throws(() => b.service.cancelAll("Mantenimiento"), /permiso/);
+  const records = [
+    r,
+    { ...r, id: "a", estado: "aprobada" },
+    { ...r, id: "b", estado: "aprobada" },
+    { ...r, id: "c", estado: "rechazada" },
+  ];
+  b.repository.write("reservas", records);
+  b.role("admin");
+  assert.throws(() => b.service.cancelAll("   "), /motivo/);
+  assert.deepEqual(b.repository.read("reservas"), records);
+  assert.equal(b.service.cancelAll("  Mantenimiento  "), 2);
+  for (const item of b.service
+    .list()
+    .filter((x) => ["a", "b"].includes(x.id))) {
+    assert.equal(item.estado, "cancelada");
+    assert.equal(item.motivoCancelacion, "Mantenimiento");
+    assert.ok(item.decidida);
+  }
+  assert.deepEqual(
+    b.service.list().find((x) => x.id === r.id),
+    r,
+  );
+  assert.equal(b.service.list().find((x) => x.id === "c").estado, "rechazada");
+  assert.throws(() => b.service.cancelAll("Mantenimiento"), /No hay/);
+});
+
 test("roles también se validan en los servicios", () => {
   const b = bookings();
   assert.throws(() => b.service.decide("1", "aprobada"), /permiso/);
@@ -155,17 +209,54 @@ function authentication() {
     },
     clock: () => clock,
     code: () => "1234",
+    session: () => ({ rol: "admin" }),
   });
   return { auth, repository, temp, tick: (n) => (clock += n) };
 }
 const account = { ...user, clave: "Prueba123", clave2: "Prueba123" };
+
+test("el registro con QR del DNI permite omitir el número de documento", async () => {
+  const a = authentication();
+  const { dni, ...data } = account;
+  await a.auth.register(data);
+  const saved = a.repository.read("usuarios")[0];
+  assert.equal(saved.dni, "");
+  assert.equal(saved.dniImagen, data.dniImagen);
+  assert.equal(saved.acceso, "pendiente");
+  a.auth.verify("1234");
+  a.auth.approveAccount(saved.id);
+  assert.equal(
+    await a.auth.login({ usuario: data.email, clave: data.clave }),
+    "cliente",
+  );
+});
+
+test("aprobar cuentas requiere admin, correo verificado e imagen del DNI", async () => {
+  const a = authentication();
+  assert.deepEqual(a.repository.read("usuarios", []), []);
+  await assert.rejects(a.auth.register({ ...account, dniImagen: "" }));
+  await a.auth.register(account);
+  const id = a.repository.read("usuarios")[0].id;
+  assert.throws(() => a.auth.approveAccount(id), /verificar/);
+  a.auth.verify("1234");
+  const unauthorized = createAuthService({
+    repository: a.repository,
+    temp: a.temp,
+    password: {},
+    session: () => ({ rol: "cliente", id }),
+  });
+  assert.throws(() => unauthorized.approveAccount(id), /permiso/);
+  assert.equal(a.repository.read("usuarios")[0].acceso, "pendiente");
+  a.auth.approveAccount(id);
+  assert.equal(a.repository.read("usuarios")[0].acceso, "aprobado");
+  assert.throws(() => a.auth.approveAccount(id), /pendiente/);
+});
 test("registro, verificación de un uso y acceso", async () => {
   const a = authentication();
   await a.auth.register(account);
   assert.equal(
     await a.auth.login({
       usuario: user.email,
-      apellido: "",
       clave: account.clave,
     }),
     "verificacion",
@@ -173,16 +264,102 @@ test("registro, verificación de un uso y acceso", async () => {
   assert.throws(() => a.auth.verify("0000"), /incorrecto/);
   assert.equal(a.auth.verify("1234"), "login");
   assert.throws(() => a.auth.verify("1234"));
+  await assert.rejects(
+    a.auth.login({ usuario: user.email, clave: account.clave }),
+    /pendiente/,
+  );
+  a.auth.approveAccount(a.repository.read("usuarios")[0].id);
   assert.equal(
     await a.auth.login({
       usuario: user.email,
-      apellido: "",
       clave: account.clave,
     }),
     "cliente",
   );
   await assert.rejects(a.auth.register(account));
 });
+test("el registro permite crear y verificar cuentas sin CUIL", async () => {
+  const a = authentication();
+  for (const [index, cuil] of [undefined, "", "   "].entries()) {
+    const data = {
+      dniImagen: user.dniImagen,
+      nombre: "Ana",
+      apellido: "Pérez",
+      dni: String(23456780 + index),
+      email: `registro${index}@ejemplo.com`,
+      clave: "Prueba123",
+      clave2: "Prueba123",
+    };
+    if (cuil !== undefined) data.cuil = cuil;
+    await a.auth.register(data);
+    assert.equal(a.temp.read("verification", null).email, data.email);
+    assert.equal(a.auth.verify("1234"), "login");
+    a.auth.approveAccount(
+      a.repository.read("usuarios").find((u) => u.email === data.email).id,
+    );
+    assert.equal(
+      await a.auth.login({ usuario: data.email, clave: data.clave }),
+      "cliente",
+    );
+    a.auth.logout();
+  }
+  const users = a.repository.read("usuarios", []);
+  assert.equal(users.length, 3);
+  assert.ok(users.every((u) => u.verificado && u.cuil === ""));
+});
+
+test("el registro sin CUIL conserva las validaciones y evita cuentas duplicadas", async () => {
+  const a = authentication(),
+    data = { ...account, cuil: "" };
+  await a.auth.register(data);
+  for (const [change, field] of [
+    [{ nombre: "A" }, "nombre"],
+    [{ apellido: "P" }, "apellido"],
+    [{ dni: "123" }, "dni"],
+    [{ email: "invalido" }, "email"],
+    [{ clave: "corta", clave2: "corta" }, "clave"],
+    [{ clave2: "Diferente123" }, "clave2"],
+    [{ dni: data.dni }, "dni"],
+    [{ email: data.email.toUpperCase() }, "email"],
+  ]) {
+    await assert.rejects(
+      a.auth.register({
+        ...data,
+        dni: "23456789",
+        email: "otra@ejemplo.com",
+        ...change,
+      }),
+      (error) => {
+        assert.deepEqual(Object.keys(error.fields), [field]);
+        return true;
+      },
+    );
+  }
+  assert.equal(a.repository.read("usuarios", []).length, 1);
+});
+
+test("el acceso de clientes usa el correo y la contraseña elegida", async () => {
+  const a = authentication();
+  await a.auth.register(account);
+  a.auth.verify("1234");
+  a.auth.approveAccount(a.repository.read("usuarios")[0].id);
+  for (const credentials of [
+    { usuario: user.nombre, apellido: user.apellido, clave: account.clave },
+    { usuario: user.dni, clave: account.clave },
+    { usuario: user.email, clave: "Incorrecta123" },
+  ]) {
+    await assert.rejects(a.auth.login(credentials), /no son correctos/);
+    assert.equal(a.repository.read("sesion", null), null);
+  }
+  assert.equal(
+    await a.auth.login({
+      usuario: `  ${user.email.toUpperCase()}  `,
+      clave: account.clave,
+    }),
+    "cliente",
+  );
+});
+
 test("código vencido y recuperación requieren una verificación vigente", async () => {
   const a = authentication();
   await a.auth.register(account);
@@ -190,6 +367,7 @@ test("código vencido y recuperación requieren una verificación vigente", asyn
   assert.throws(() => a.auth.verify("1234"), /venció/);
   a.auth.resend();
   a.auth.verify("1234");
+  a.auth.approveAccount(a.repository.read("usuarios")[0].id);
   await assert.rejects(a.auth.reset(account), /Verificá/);
   a.auth.recover(user.email);
   assert.equal(a.auth.verify("1234"), "nueva-clave");
@@ -198,7 +376,6 @@ test("código vencido y recuperación requieren una verificación vigente", asyn
   assert.equal(
     await a.auth.login({
       usuario: user.email,
-      apellido: "",
       clave: "Nueva1234",
     }),
     "cliente",

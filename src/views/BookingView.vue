@@ -143,7 +143,7 @@ function confirm() {
       <div class="actions">
         <button class="btn btn-primary" @click="app.pdf.note(reservation)">
           Descargar nota en PDF</button
-        ><RouterLink class="btn btn-sec" to="/cliente/reservas"
+        ><RouterLink class="btn btn-sec" to="/cliente"
           >Ver mis reservas</RouterLink
         >
       </div>

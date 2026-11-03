@@ -34,10 +34,12 @@ Administración puede cambiar el acceso de Prensa. Las credenciales iniciales ya
 ## Funciones migradas
 
 - Consulta pública: estado de cancha, calendario mensual, disponibilidad por hora, actividades, flyers e información.
+- Clases: la página principal muestra Básquet, Vóley, Handball, Taekwondo, Gimnasia artística y Gimnasia en tela, inicialmente con horarios a confirmar. En Administración → Clases se pueden agregar, editar y eliminar clases, con descripción opcional y varios horarios semanales. Los horarios son informativos y no generan reservas ni bloqueos del calendario.
+- El botón «Clases» junto a «Ingresar» abre `/#/clases`, con fotos, descripciones y acceso a `/#/clases/:id/inscripcion`. La inscripción es directa, sin cuenta, con nombre, apellido, correo y teléfono de contacto; permite elegir un horario publicado o inscribirse con horario a confirmar. Administración → Clases → Ver inscripciones permite consultar los registros. No envía correos ni confirma cupos automáticamente.
 - Acceso: registro, verificación, reenvío, ingreso por correo/DNI/nombre y apellido, recuperación y nueva contraseña.
 - Cliente: solicitud con validación, borrador durante la sesión, vista previa de nota, confirmación, descarga PDF, reservas próximas y perfil.
 - Administración: resumen, calendario y detalles, solicitudes por estado, aprobación, rechazo, cancelación, informes PDF diarios/semanales/mensuales, estado de cancha y credenciales de Prensa.
-- Prensa: crear, editar y eliminar actividades, procesar/quitar flyers, consultar reservas confirmadas sin mostrar datos personales y editar información pública.
+- Prensa: una única pantalla sin menú lateral para crear, editar y eliminar eventos y avisos. Los eventos se muestran en tarjetas con fecha y flyer opcional; los avisos usan un globo con megáfono y permanecen publicados hasta su eliminación. El botón «Añadir evento» permite elegir el tipo de publicación.
 - Interfaz adaptable, modo oscuro del sistema, etiquetas de formularios, navegación por teclado y diálogos nativos con gestión de foco.
 
 ## Organización
@@ -58,6 +60,12 @@ src/
 ```
 
 ## Datos existentes
+
+Las clases se guardan en `sumbv_clases` con nombre, descripción y horarios por día de la semana. Las seis clases iniciales se usan solo cuando esa clave todavía no existe; editar o eliminar clases, incluso todas, se conserva al recargar. Comparten el almacenamiento local del resto de la aplicación.
+
+Las inscripciones usan `sumbv_inscripciones_clases` y conservan una copia del nombre de la clase y horario elegido. También son locales al navegador: para recibir inscripciones desde otros dispositivos hace falta conectar un backend. Las fotos ilustrativas se incluyen en `public/img/clases`, con créditos y licencias en `src/domain/class-photos.json` y visibles en las tarjetas. Son miniaturas de Wikimedia Commons, mostradas con encuadre CSS; las imágenes conservan las licencias indicadas. Administración puede reemplazarlas por fotos propias. Las clases guardadas antes de incorporar fotos reciben los detalles iniciales solo si conservan su identidad original; los textos personalizados y las clases eliminadas se respetan.
+
+Las publicaciones conservan la clave `sumbv_actividades` y agregan `tipo` (`evento` o `aviso`). Los registros anteriores, sin ese campo, se interpretan como eventos. Los avisos requieren título y mensaje; no guardan fecha, horarios ni flyer. La vista pública muestra avisos y eventos de hoy en adelante; Prensa conserva el listado completo para administrarlo. Las antiguas rutas `/prensa/actividades` y `/prensa/informacion` redirigen a `/prensa`.
 
 Se mantienen las claves `sumbv_usuarios`, `sumbv_reservas`, `sumbv_actividades`, `sumbv_info`, `sumbv_cancha`, `sumbv_prensa`, `sumbv_sesion`, `sumbv_contador` y `sumbv_codigos`. Si el proyecto se sirve bajo el mismo protocolo, dominio y puerto del original, puede leer esos datos. Un origen diferente tiene otro almacenamiento: los datos no se transfieren automáticamente. Los datos demo se generan solo cuando no existe la clave de reservas. Los borradores y verificaciones temporales anteriores no se importan; se inicia nuevamente ese proceso.
 

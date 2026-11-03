@@ -2,16 +2,22 @@
 import { ref, computed } from "vue";
 import { useApp } from "../application/context.js";
 import { iso } from "../domain/date.js";
+import {
+  isPublicationVisible,
+  sortPublications,
+} from "../domain/publications.js";
 import CourtStatus from "../components/CourtStatus.vue";
 import AvailabilityCalendar from "../components/AvailabilityCalendar.vue";
-import ReserveButton from "../components/ReserveButton.vue";
 import ActivityCard from "../components/ActivityCard.vue";
+import ClassCard from "../components/ClassCard.vue";
 const app = useApp(),
   day = ref(iso(new Date()));
 const activities = computed(() =>
-  app.activities.value
-    .filter((a) => a.fecha >= iso(app.clock.value))
-    .sort((a, b) => a.fecha.localeCompare(b.fecha)),
+  sortPublications(
+    app.activities.value.filter((a) =>
+      isPublicationVisible(a, iso(app.clock.value)),
+    ),
+  ),
 );
 </script>
 <template>
@@ -19,9 +25,12 @@ const activities = computed(() =>
   <section
     v-if="activities.length"
     class="seccion stack"
-    aria-label="Actividades publicadas"
+    aria-labelledby="public-news-title"
   >
-    <ActivityCard v-for="a in activities" :key="a.id" :activity="a" />
+    <h2 id="public-news-title">Eventos y avisos</h2>
+    <div class="publications-grid">
+      <ActivityCard v-for="a in activities" :key="a.id" :activity="a" />
+    </div>
   </section>
   <CourtStatus reserve />
   <section class="seccion">
@@ -32,6 +41,21 @@ const activities = computed(() =>
     </p>
     <AvailabilityCalendar v-model="day" />
     <!--<div class="actions"><ReserveButton /></div>-->
+  </section>
+  <section id="clases" class="seccion" aria-labelledby="public-classes-title">
+    <h2 id="public-classes-title">Clases</h2>
+    <p class="sub">Conocé las clases del SUM y sus horarios semanales.</p>
+    <div v-if="app.classes.value.length" class="classes-grid">
+      <ClassCard
+        v-for="lesson in app.classes.value"
+        :key="lesson.id"
+        :lesson="lesson"
+        enrollable
+      />
+    </div>
+    <p v-else class="vacio-msg">
+      Próximamente publicaremos nuevas clases y horarios.
+    </p>
   </section>
   <section class="seccion">
     <h2>Información del SUM</h2>

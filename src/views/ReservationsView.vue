@@ -8,63 +8,100 @@ import StatusBadge from "../components/StatusBadge.vue";
 import ReservationDetail from "../components/ReservationDetail.vue";
 import AppModal from "../components/AppModal.vue";
 import ReportDialog from "../components/ReportDialog.vue";
+import FormField from "../components/FormField.vue";
 const props = defineProps({ requests: Boolean }),
   app = useApp(),
   route = useRoute(),
-  state = ref(
-    ["pendiente", "aprobada", "rechazada"].includes(route.query.estado)
-      ? route.query.estado
-      : "pendiente",
-  ),
   selectedId = ref(null),
   pending = ref(null),
   report = ref(false),
   error = ref("");
+const stateFilter = computed(() =>
+  !props.requests && ["aprobada", "rechazada"].includes(route.query.estado)
+    ? route.query.estado
+    : null,
+);
 const records = computed(() =>
   sortReservations(
-    app.reservations.value.filter(
-      (r) => !props.requests || r.estado === state.value,
+    app.reservations.value.filter((r) =>
+      props.requests
+        ? r.estado === "pendiente"
+        : stateFilter.value
+          ? r.estado === stateFilter.value
+          : ["aprobada", "rechazada"].includes(r.estado),
     ),
   ),
 );
 const selected = computed(() =>
   app.reservations.value.find((r) => r.id === selectedId.value),
 );
-const labels = {
-  pendiente: "Pendientes",
-  aprobada: "Aprobadas",
-  rechazada: "Rechazadas",
-};
-function decide(id, value) {
+const approvedCount = computed(
+  () => app.reservations.value.filter((r) => r.estado === "aprobada").length,
+);
+function confirmDecision() {
+  if (!pending.value.all) {
+    decide(pending.value.r.id, pending.value.state, pending.value.reason);
+    return;
+  }
   error.value = "";
   try {
-    app.booking.decide(id, value);
-    app.notify("Solicitud actualizada.");
+    const count = app.booking.cancelAll(pending.value.reason);
+    app.notify(`${count} reservas canceladas.`);
+    pending.value = null;
   } catch (e) {
     error.value = e.message;
-  } finally {
+  }
+}
+function decide(id, value, reason = "") {
+  error.value = "";
+  try {
+    app.booking.decide(id, value, reason);
+    app.notify("Solicitud actualizada.");
     pending.value = null;
+  } catch (e) {
+    error.value = e.message;
   }
 }
 </script>
 <template>
-  <div v-if="requests" class="tabs">
-    <button
-      v-for="(label, value) in labels"
-      :key="value"
-      :aria-pressed="state === value"
-      @click="state = value"
-    >
-      {{ label }} ({{
-        app.reservations.value.filter((r) => r.estado === value).length
-      }})
-    </button>
-  </div>
-  <div v-else class="barra">
-    <p>{{ records.length }} reservas registradas</p>
-    <button class="btn btn-primary" @click="report = true">
-      Generar informe PDF
-    </button>
+  <div v-if="!requests" class="barra">
+    <p>
+      {{ records.length }} reservas
+      {{
+        stateFilter === "aprobada"
+          ? "aprobadas"
+          : stateFilter === "rechazada"
+            ? "rechazadas"
+            : "registradas"
+      }}
+    </p>
+    <div class="actions">
+      <RouterLink
+        v-if="stateFilter"
+        to="/administracion/reservas"
+        class="btn btn-sec"
+      >
+        Ver todas las reservas
+      </RouterLink>
+      <button class="btn btn-primary" @click="report = true">
+        Generar informe PDF
+      </button>
+      <button
+        class="btn btn-peligro"
+        :disabled="!approvedCount"
+        @click="
+          error = '';
+          pending = {
+            all: true,
+            state: 'cancelada',
+            label: 'Cancelar todas las reservas',
+            reason: '',
+          };
+        "
+      >
+        Cancelar todas las reservas
+      </button>
+    </div>
   </div>
   <p v-if="error" class="err" role="alert">{{ error }}</p>
   <div class="stack">
@@ -97,10 +134,22 @@ function decide(id, value) {
             Rechazar
           </button></template
         ><button
-          v-if="!requests && ['pendiente', 'aprobada'].includes(r.estado)"
+          v-if="!requests && r.estado === 'rechazada'"
+          class="btn btn-primary btn-chico"
+          @click="decide(r.id, 'aprobada')"
+        >
+          Volver a aceptar
+        </button>
+        <button
+          v-if="!requests && r.estado === 'aprobada'"
           class="btn btn-peligro btn-chico"
           @click="
-            pending = { r, state: 'cancelada', label: 'Cancelar reserva' }
+            pending = {
+              r,
+              state: 'cancelada',
+              label: 'Cancelar reserva',
+              reason: '',
+            }
           "
         >
           Cancelar
@@ -108,7 +157,15 @@ function decide(id, value) {
       </div>
     </article>
     <p v-if="!records.length" class="bloque">
-      No hay solicitudes para mostrar.
+      {{
+        requests
+          ? "No hay solicitudes pendientes para mostrar."
+          : stateFilter === "aprobada"
+            ? "No hay reservas aprobadas para mostrar."
+            : stateFilter === "rechazada"
+              ? "No hay reservas rechazadas para mostrar."
+              : "No hay reservas aprobadas o rechazadas para mostrar."
+      }}
     </p>
   </div>
   <ReservationDetail
@@ -119,16 +176,33 @@ function decide(id, value) {
     v-if="pending"
     :title="pending.label"
     @close="pending = null"
-    ><p>
+    ><p v-if="pending.all">
+      Se cancelarán las {{ approvedCount }} reservas aprobadas. El motivo
+      quedará guardado en cada reserva y sus horarios quedarán disponibles.
+    </p>
+    <p v-else>
       {{ pending.label }} de {{ pending.r.cliente.nombre }}
       {{ pending.r.cliente.apellido }} del {{ fechaCorta(pending.r.fecha) }}. El
       horario quedará disponible.
     </p>
+    <form id="reservation-decision" @submit.prevent="confirmDecision">
+      <FormField
+        v-if="pending.state === 'cancelada'"
+        v-model="pending.reason"
+        name="motivo-cancelacion"
+        label="Motivo de la cancelación"
+        type="textarea"
+        required
+      />
+      <p v-if="error" class="err" role="alert">{{ error }}</p>
+    </form>
     <template #actions
       ><button class="btn btn-sec" @click="pending = null">Volver</button
       ><button
         class="btn btn-peligro"
-        @click="decide(pending.r.id, pending.state)"
+        type="submit"
+        form="reservation-decision"
+        :disabled="pending.state === 'cancelada' && !pending.reason.trim()"
       >
         {{ pending.label }}
       </button></template

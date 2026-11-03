@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, ref, computed } from "vue";
+import { reactive, ref, computed, onMounted, onUnmounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { home } from "../router/index.js";
 import { useApp } from "../application/context.js";
@@ -12,17 +12,34 @@ const d = reactive({
     usuario: "",
     apellido: "",
     nombre: "",
-    dni: "",
     cuil: "",
     email: "",
     clave: "",
     clave2: "",
     codigo: "",
+    dniImagen: "",
   }),
   errors = ref({}),
   error = ref(""),
   busy = ref(false),
+  formVersion = ref(0),
   verification = ref(app.temp.read("verification", null));
+function clearLogin() {
+  if (props.mode !== "login") return;
+  d.usuario = "";
+  d.clave = "";
+  errors.value = {};
+  error.value = "";
+  formVersion.value++;
+}
+function restorePage(event) {
+  if (event.persisted) clearLogin();
+}
+onMounted(() => {
+  clearLogin();
+  window.addEventListener("pageshow", restorePage);
+});
+onUnmounted(() => window.removeEventListener("pageshow", restorePage));
 const titles = {
   login: "Iniciar sesión",
   registro: "Registrarse",
@@ -34,18 +51,15 @@ const fields = computed(
   () =>
     ({
       login: [
-        ["usuario", "Usuario, correo, DNI o nombre", "text"],
-        ["apellido", "Apellido (solo al ingresar por nombre)", "text"],
+        ["usuario", "Usuario (correo electrónico)", "text"],
         ["clave", "Contraseña", "password"],
       ],
       registro: [
         ["nombre", "Nombre", "text"],
         ["apellido", "Apellido", "text"],
-        ["dni", "DNI", "text"],
-        ["email", "Email", "email"],
+        ["email", "Usuario (correo electrónico)", "email"],
         ["clave", "Contraseña", "password"],
         ["clave2", "Confirmar contraseña", "password"],
-        ["cuil", "CUIL", "text"],
       ],
       recuperar: [["email", "Email", "email"]],
       "nueva-clave": [
@@ -83,7 +97,7 @@ async function submit() {
     if (props.mode === "verificacion") {
       destination = "/" + app.auth.verify(d.codigo);
       if (destination === "/login")
-        app.notify("Cuenta verificada. Ya podés iniciar sesión.");
+        app.notify("Correo verificado. Administración debe aprobar tu acceso.");
     }
     if (props.mode === "nueva-clave") {
       await app.auth.reset(d);
@@ -96,6 +110,34 @@ async function submit() {
     });
   } catch (e) {
     errors.value = e.fields || {};
+    error.value = e.message;
+  } finally {
+    busy.value = false;
+  }
+}
+async function attachDni(event) {
+  d.dniImagen = "";
+  error.value = "";
+  const file = event.target.files?.[0];
+  if (!file) return;
+  if (
+    !["image/jpeg", "image/png", "image/webp"].includes(file.type) ||
+    file.size > 2 * 1024 * 1024
+  ) {
+    error.value = "Adjuntá una imagen JPG, PNG o WebP de hasta 2 MB.";
+    event.target.value = "";
+    return;
+  }
+  busy.value = true;
+  try {
+    d.dniImagen = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () =>
+        reject(Error("No se pudo leer la imagen del QR del DNI."));
+      reader.readAsDataURL(file);
+    });
+  } catch (e) {
     error.value = e.message;
   } finally {
     busy.value = false;
@@ -114,8 +156,9 @@ function resend() {
       Para continuar, iniciá sesión con el perfil correspondiente.
     </p>
     <p v-if="mode === 'registro'" class="sub">
-      Todos los campos son obligatorios. La contraseña requiere al menos 8
-      caracteres, con letras y números.
+      Tu correo electrónico será tu usuario para iniciar sesión. Todos los
+      campos son obligatorios. Elegí una contraseña de al menos 8 caracteres,
+      con letras y números.
     </p>
     <p v-if="mode === 'recuperar'" class="sub">
       Ingresá el correo de tu cuenta para generar un código de prueba.
@@ -131,7 +174,11 @@ function resend() {
         ><span v-else>Si existe la cuenta, habrá un código disponible.</span>
       </p></template
     >
-    <form @submit.prevent="submit">
+    <form
+      :key="formVersion"
+      :autocomplete="mode === 'login' ? 'off' : undefined"
+      @submit.prevent="submit"
+    >
       <FormField
         v-for="[name, label, type] in fields"
         :key="name"
@@ -140,7 +187,9 @@ function resend() {
         :label="label"
         :type="type"
         :error="errors[name]"
-        :required="!(mode === 'login' && name === 'apellido')"
+        :data-lpignore="mode === 'login' ? 'true' : undefined"
+        :data-1p-ignore="mode === 'login' ? '' : undefined"
+        required
         :maxlength="
           name === 'codigo'
             ? 4
@@ -151,22 +200,51 @@ function resend() {
                 : 100
         "
         :inputmode="
-          ['codigo', 'cuil', 'dni'].includes(name) ? 'numeric' : undefined
+          ['codigo', 'cuil', 'dni'].includes(name)
+            ? 'numeric'
+            : name === 'usuario' || name === 'email'
+              ? 'email'
+              : undefined
         "
         :autocomplete="
-          name === 'codigo'
-            ? 'one-time-code'
-            : type === 'password'
-              ? mode === 'login'
-                ? 'current-password'
-                : 'new-password'
-              : name === 'usuario'
-                ? 'username'
+          mode === 'login'
+            ? type === 'password'
+              ? 'new-password'
+              : 'off'
+            : name === 'codigo'
+              ? 'one-time-code'
+              : type === 'password'
+                ? 'new-password'
                 : name === 'email'
                   ? 'email'
                   : 'off'
         "
       />
+      <div v-if="mode === 'registro'" class="campo">
+        <a
+          class="btn btn-sec"
+          href="https://mi.argentina.gob.ar/"
+          target="_blank"
+          rel="noopener noreferrer"
+          >Ir a Mi Argentina (abre en otra pestaña)</a
+        >
+        <label for="dni-imagen">QR del DNI</label>
+        <input
+          id="dni-imagen"
+          type="file"
+          accept="image/jpeg,image/png,image/webp"
+          required
+          aria-describedby="dni-imagen-help"
+          @change="attachDni"
+        />
+        <small id="dni-imagen-help"
+          >Adjuntá una imagen del QR del DNI en JPG, PNG o WebP, hasta 2 MB.
+          Administración revisará el QR para aprobar el acceso.</small
+        >
+        <p v-if="errors.dniImagen" class="err" role="alert">
+          {{ errors.dniImagen }}
+        </p>
+      </div>
       <p v-if="error" class="err" role="alert">{{ error }}</p>
       <div class="actions" :class="{ 'login-actions': mode === 'login' }">
         <button class="btn btn-primary" :disabled="busy">

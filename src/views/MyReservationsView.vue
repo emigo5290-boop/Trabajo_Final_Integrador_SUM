@@ -23,7 +23,7 @@ const records = computed(() =>
   <div class="stack">
     <article v-for="r in records" :key="r.id" class="tarjeta-sol">
       <div class="cab-sol">
-        <h2>{{ fechaCorta(r.fecha) }}</h2>
+        <h3>{{ fechaCorta(r.fecha) }}</h3>
         <StatusBadge :status="r.estado" />
       </div>
       <p>{{ r.inicio }} – {{ r.fin }} · {{ r.actividad }}</p>
@@ -33,9 +33,6 @@ const records = computed(() =>
     </article>
     <section v-if="!records.length" class="bloque">
       <p>No tenés reservas actuales ni próximas.</p>
-      <RouterLink class="btn btn-primary" to="/cliente/reservar"
-        >Reservar cancha</RouterLink
-      >
     </section>
   </div>
 </template>

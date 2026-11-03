@@ -12,10 +12,10 @@ export const CONFIG = {
 
   // ★ Cuenta de Administración predeterminada. Modificar aquí cuando se necesite.
   //   (Nunca se muestran en la interfaz.)
-  ADMIN: { usuario: "Admin sum", clave: "admin123" },
+  ADMIN: { usuario: "admin", clave: "admin123" },
 
   // Cuenta inicial del perfil Prensa (la Administración puede cambiarla desde su sección "Prensa").
-  PRENSA: { usuario: "prensa", clave: "prensa123" },
+  PRENSA: { usuario: "prensa", clave: "adminp123" },
 
   MI_ARGENTINA_URL: "https://mi.argentina.gob.ar",
 

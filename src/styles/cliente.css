@@ -1,5 +1,23 @@
 /* SUM Municipal - Estilos exclusivos del panel de Cliente */
 
+.client-reservations-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+.client-reservations-header h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 900 clamp(1.9rem, 4vw, 2.6rem)/1.05 var(--display);
+}
+.client-reservations-header > .btn {
+  flex: none;
+  max-width: 50%;
+}
+
 .disp {
   border: 1.5px solid var(--line);
   border-radius: 12px;

@@ -36,6 +36,10 @@ const note = ref(false),
       <dd>{{ reservation.observaciones || "Sin observaciones" }}</dd>
       <dt>Estado</dt>
       <dd><StatusBadge :status="reservation.estado" /></dd>
+      <template v-if="reservation.motivoCancelacion">
+        <dt>Motivo de la cancelación</dt>
+        <dd>{{ reservation.motivoCancelacion }}</dd>
+      </template>
     </dl>
     <template #actions
       ><button class="btn btn-sec" @click="note = !note">

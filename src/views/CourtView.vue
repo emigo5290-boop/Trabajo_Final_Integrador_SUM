@@ -47,14 +47,16 @@ function save() {
           />{{ label }}</label
         >
       </fieldset>
+      <FormField
+        v-if="form.estado !== 'disponible'"
+        v-model="form.motivo"
+        name="motivo"
+        label="Mensaje breve"
+        maxlength="140"
+        required
+      />
       <template v-if="form.estado === 'fuera_de_servicio'"
-        ><FormField
-          v-model="form.motivo"
-          name="motivo"
-          label="Motivo"
-          maxlength="140"
-          required />
-        <div class="fila2">
+        ><div class="fila2">
           <FormField
             v-model="form.desde"
             name="desde"

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted, watch, nextTick } from "vue";
+import { computed, onMounted, onUnmounted, watch } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { useApp } from "./application/context.js";
 import AppLayout from "./components/AppLayout.vue";
@@ -16,13 +16,6 @@ watch(
       router.replace("/login");
   },
 );
-watch(
-  () => route.path,
-  async () => {
-    await nextTick();
-    document.querySelector("main h1")?.focus({ preventScroll: true });
-  },
-);
 onMounted(() => {
   timer = setInterval(app.refresh, 30000);
   window.addEventListener("storage", app.refresh);
@@ -30,6 +23,7 @@ onMounted(() => {
 });
 onUnmounted(() => {
   clearInterval(timer);
+  app.notify("");
   window.removeEventListener("storage", app.refresh);
   window.removeEventListener("pageshow", app.refresh);
 });

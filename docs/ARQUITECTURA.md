@@ -39,8 +39,10 @@ El repositorio local es síncrono. Un backend HTTP necesitará una adaptación e
 | `html/administracion/cancha.html` | `/#/administracion/cancha` |
 | `html/administracion/prensa.html` | `/#/administracion/prensa` |
 | `html/prensa/inicio.html` | `/#/prensa` |
-| `html/prensa/actividades.html` | `/#/prensa/actividades` |
-| `html/prensa/informacion.html` | `/#/prensa/informacion` |
+| `html/prensa/actividades.html` | `/#/prensa` (el enlace anterior redirige) |
+| `html/prensa/informacion.html` | `/#/prensa` (el enlace anterior redirige) |
+
+Prensa utiliza una sola vista, `PressView.vue`, sin menú lateral ni listado de reservas. `ActivityEditor.vue` permite elegir evento o aviso; `ActivityCard.vue` presenta los eventos como tarjetas y los avisos como globos con megáfono, reutilizando la misma presentación en el sitio público. `domain/publications.js` concentra validación, orden y visibilidad; `application/content.js` mantiene los permisos y la persistencia. Se conserva la clave de almacenamiento `actividades`; los registros sin `tipo` se consideran eventos. El contenido institucional ya guardado continúa visible en la página pública.
 
 Los HTML antiguos se sustituyen por rutas; los enlaces antiguos no se redirigen automáticamente. Las reservas administrativas se presentan como tarjetas reutilizando los mismos datos y acciones. La verificación usa un campo de cuatro dígitos que permite pegar el código completo. Las actividades públicas se muestran también cuando no tienen flyer.
 

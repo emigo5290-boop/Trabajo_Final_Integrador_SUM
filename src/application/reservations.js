@@ -70,7 +70,26 @@ export function createReservationService({
       repository.write("reservas", [...all(), r]);
       return r;
     },
-    decide(reservationId, state) {
+    cancelAll(reason = "") {
+      requireRole("admin");
+      const motivoCancelacion = reason.trim();
+      if (!motivoCancelacion)
+        throw Error("Indicá el motivo de la cancelación.");
+      const records = all();
+      const count = records.filter((r) => r.estado === "aprobada").length;
+      if (!count) throw Error("No hay reservas aprobadas para cancelar.");
+      const decidida = ahoraLocal();
+      repository.write(
+        "reservas",
+        records.map((r) =>
+          r.estado === "aprobada"
+            ? { ...r, estado: "cancelada", motivoCancelacion, decidida }
+            : r,
+        ),
+      );
+      return count;
+    },
+    decide(reservationId, state, reason = "") {
       requireRole("admin");
       const records = all(),
         r = records.find((r) => r.id === reservationId);
@@ -80,9 +99,14 @@ export function createReservationService({
           ? ["aprobada", "rechazada", "cancelada"]
           : r.estado === "aprobada"
             ? ["cancelada"]
-            : [];
+            : r.estado === "rechazada"
+              ? ["aprobada"]
+              : [];
       if (!permitted.includes(state))
         throw Error("La solicitud ya cambió de estado.");
+      const cancellationReason = reason.trim();
+      if (state === "cancelada" && !cancellationReason)
+        throw Error("Indicá el motivo de la cancelación.");
       if (state === "aprobada") {
         const c = checkAvailability(r, records, court(), clock(), r.id);
         if (!c.ok) throw Error(c.motivo);
@@ -90,7 +114,16 @@ export function createReservationService({
       repository.write(
         "reservas",
         records.map((x) =>
-          x.id === r.id ? { ...x, estado: state, decidida: ahoraLocal() } : x,
+          x.id === r.id
+            ? {
+                ...x,
+                estado: state,
+                decidida: ahoraLocal(),
+                ...(state === "cancelada"
+                  ? { motivoCancelacion: cancellationReason }
+                  : {}),
+              }
+            : x,
         ),
       );
     },

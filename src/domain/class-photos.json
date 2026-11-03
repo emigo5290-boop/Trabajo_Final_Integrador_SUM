@@ -1,0 +1,44 @@
+{
+  "gimnasia-en-tela": {
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:2019-06-27_1st_FIG_Artistic_Gymnastics_JWCH_Opening_ceremony_(Martin_Rulsch)_59.jpg",
+    "author": "Martin Rulsch, Wikimedia Commons",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "src": "/img/clases/gimnasia-en-tela.jpg"
+  },
+  "basquet": {
+    "license": "CC BY-SA 3.0",
+    "source": "https://commons.wikimedia.org/wiki/File:HK_YMCA_TST_Club_Basketball_Court_n_Young_Children_Course_a.jpg",
+    "author": "TSalitcm",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "src": "/img/clases/basquet.jpg"
+  },
+  "voley": {
+    "license": "Public domain",
+    "source": "https://commons.wikimedia.org/wiki/File:2015_Commander,_Fleet_Activities_Yokosuka_Captain%27s_Cup_150207-N-GT589-067.jpg",
+    "author": "U.S. Navy photo by Mass Communication Seaman Everett Allen/Released",
+    "licenseUrl": null,
+    "src": "/img/clases/voley.jpg"
+  },
+  "taekwondo": {
+    "license": "CC BY-SA 4.0",
+    "source": "https://commons.wikimedia.org/wiki/File:2018-10-05_Taekwondo_Training_at_2018_Summer_Youth_Olympics_(Martin_Rulsch)_02.jpg",
+    "author": "Martin Rulsch, Wikimedia Commons",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "src": "/img/clases/taekwondo.jpg"
+  },
+  "handball": {
+    "license": "CC0",
+    "source": "https://commons.wikimedia.org/wiki/File:Handball.jpg",
+    "author": "Physolange",
+    "licenseUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    "src": "/img/clases/handball.jpg"
+  },
+  "gimnasia-artistica": {
+    "license": "CC BY 2.0",
+    "source": "https://commons.wikimedia.org/wiki/File:Boy_training_with_still_rings.jpg",
+    "author": "Rick McCharles",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0",
+    "src": "/img/clases/gimnasia-artistica.jpg"
+  }
+}

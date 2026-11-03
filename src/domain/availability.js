@@ -109,6 +109,9 @@ export function currentStatus(reservations, court, now = new Date()) {
         : null;
   return {
     clave,
+    motivo: ["ocupada", "reservada"].includes(court.estado)
+      ? court.motivo
+      : "",
     ref,
     proxima: future.find((r) => r !== ref),
     manual: ["ocupada", "reservada"].includes(court.estado),

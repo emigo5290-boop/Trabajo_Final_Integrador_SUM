@@ -238,7 +238,7 @@ a {
   justify-content: space-between;
   gap: 14px;
   padding: 12px var(--gutter);
-  max-width: 1120px;
+  max-width: none;
   margin: 0 auto;
 }
 .marca {
@@ -256,6 +256,7 @@ a {
   height: 54px;
   object-fit: contain;
   flex: none;
+  border-radius: 50%;
 }
 .marca-txt {
   min-width: 0;
@@ -279,9 +280,6 @@ a {
   flex: none;
 }
 @media (max-width: 560px) {
-  .cab-acc {
-    width: 100%;
-  }
   .marca-nombre {
     font-size: 1.4rem;
   }

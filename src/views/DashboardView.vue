@@ -4,6 +4,8 @@ import { useApp } from "../application/context.js";
 import { iso, fechaCorta } from "../domain/date.js";
 import { sortReservations } from "../domain/availability.js";
 import CourtStatus from "../components/CourtStatus.vue";
+import CalendarView from "./CalendarView.vue";
+import MyReservationsView from "./MyReservationsView.vue";
 const app = useApp();
 const today = computed(() => iso(app.clock.value));
 const upcoming = computed(() =>
@@ -21,20 +23,36 @@ const states = {
 </script>
 <template>
   <CourtStatus
+    :class="{ 'marcador--resumen': app.session.value.rol === 'admin' }"
     :admin="app.session.value.rol === 'admin'"
-    :reserve="app.session.value.rol === 'cliente'"
-  /><template v-if="app.session.value.rol === 'admin'"
-    ><div class="cifras">
+  >
+    <div v-if="app.session.value.rol === 'admin'" class="cifras">
       <RouterLink
         v-for="(label, state) in states"
         :key="state"
-        :to="{ path: '/administracion/solicitudes', query: { estado: state } }"
+        :to="{
+          path:
+            state === 'pendiente'
+              ? '/administracion/solicitudes'
+              : '/administracion/reservas',
+          query: { estado: state },
+        }"
         ><b>{{
           app.reservations.value.filter((r) => r.estado === state).length
         }}</b>
         <span>{{ label }}</span></RouterLink
       >
     </div>
+  </CourtStatus>
+  <template v-if="app.session.value.rol === 'admin'">
+    <section class="seccion" aria-labelledby="admin-calendar-title">
+      <h2 id="admin-calendar-title">Calendario de disponibilidad</h2>
+      <p class="sub">
+        Elegí un día para consultar los horarios y ver el detalle de las
+        reservas.
+      </p>
+      <CalendarView />
+    </section>
     <div class="dos-col">
       <section
         v-for="isToday in [true, false]"
@@ -70,6 +88,19 @@ const states = {
           No hay reservas aprobadas.
         </p>
       </section>
-    </div></template
+    </div>
+  </template>
+  <section
+    v-else-if="app.session.value.rol === 'cliente'"
+    class="seccion"
+    aria-labelledby="client-reservations-title"
   >
+    <div class="client-reservations-header">
+      <h2 id="client-reservations-title">Mis reservas</h2>
+      <RouterLink class="btn btn-primary btn-chico" to="/cliente/reservar">
+        Reservar cancha
+      </RouterLink>
+    </div>
+    <MyReservationsView />
+  </section>
 </template>

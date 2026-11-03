@@ -1,46 +1,18 @@
 import { jsPDF } from "jspdf";
 import { CONFIG } from "../config.js";
-import { iso, deISO, fechaCorta, p2, cap, MESES } from "../domain/date.js";
-import { sortReservations as ordenar } from "../domain/availability.js";
+import { iso, fechaCorta, p2 } from "../domain/date.js";
 import { datosNota } from "../domain/note.js";
+import { createReservationReportService } from "../application/reservation-report.js";
+
+// Conservamos el acceso existente para quienes importaban esta función desde PDF.
+export { rangoPeriodo } from "../domain/reservation-report.js";
 const ETIQ_SOL = {
   pendiente: "Pendiente",
   aprobada: "Aprobada",
   rechazada: "Rechazada",
   cancelada: "Cancelada",
 };
-export function rangoPeriodo(periodo, fecha) {
-  const d = deISO(fecha);
-  if (periodo === "dia")
-    return { desde: fecha, hasta: fecha, texto: `Día ${fechaCorta(fecha)}` };
-  if (periodo === "semana") {
-    const lun = new Date(d);
-    lun.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-    const dom = new Date(lun);
-    dom.setDate(lun.getDate() + 6);
-    return {
-      desde: iso(lun),
-      hasta: iso(dom),
-      texto: `Semana del ${fechaCorta(iso(lun))} al ${fechaCorta(iso(dom))}`,
-    };
-  }
-  const p = new Date(d.getFullYear(), d.getMonth(), 1),
-    u = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return {
-    desde: iso(p),
-    hasta: iso(u),
-    texto: `${cap(MESES[d.getMonth()])} de ${d.getFullYear()}`,
-  };
-}
-export function generarInforme(periodo, fecha, reservations) {
-  const rg = rangoPeriodo(periodo, fecha);
-  // Se incluyen reservas aprobadas, pendientes y canceladas del período (las rechazadas no llegan a ser reservas)
-  const lista = ordenar(
-    reservations.filter(
-      (r) =>
-        r.estado !== "rechazada" && r.fecha >= rg.desde && r.fecha <= rg.hasta,
-    ),
-  );
+function renderReservationReportPdf({ range, reservations, generatedAt }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const mx = 20,
     cols = [
@@ -60,19 +32,18 @@ export function generarInforme(periodo, fecha, reservations) {
   doc.setFont("helvetica", "normal");
   doc.text(CONFIG.MUNICIPALIDAD, mx, y);
   y += 8;
-  doc.text("Período: " + rg.texto, mx, y);
+  doc.text("Período: " + range.texto, mx, y);
   y += 5.5;
-  const g = new Date();
   doc.text(
-    `Fecha de generación: ${fechaCorta(iso(g))} ${p2(g.getHours())}:${p2(g.getMinutes())} hs`,
+    `Fecha de generación: ${fechaCorta(iso(generatedAt))} ${p2(generatedAt.getHours())}:${p2(generatedAt.getMinutes())} hs`,
     mx,
     y,
   );
   y += 5.5;
   doc.setFont("helvetica", "bold");
-  doc.text("Cantidad de reservas: " + lista.length, mx, y);
+  doc.text("Cantidad de reservas: " + reservations.length, mx, y);
   y += 9;
-  const cabTabla = () => {
+  const drawTableHeader = () => {
     doc.setFillColor(230, 235, 232);
     doc.rect(mx, y - 5, 170, 8, "F");
     doc.setFont("helvetica", "bold");
@@ -85,31 +56,43 @@ export function generarInforme(periodo, fecha, reservations) {
     y += 7;
     doc.setFont("helvetica", "normal");
   };
-  cabTabla();
-  if (!lista.length) {
+  drawTableHeader();
+  if (!reservations.length) {
     doc.text("No hay reservas en el período seleccionado.", mx + 2, y + 2);
   }
-  lista.forEach((r) => {
-    const act = doc.splitTextToSize(r.actividad, cols[2].w - 4),
-      alto = Math.max(1, act.length) * 5 + 3;
-    if (y + alto > 280) {
+  reservations.forEach((reservation) => {
+    const activityLines = doc.splitTextToSize(
+      reservation.actividad,
+      cols[2].w - 4,
+    );
+    const rowHeight = Math.max(1, activityLines.length) * 5 + 3;
+    if (y + rowHeight > 280) {
       doc.addPage();
       y = 22;
-      cabTabla();
+      drawTableHeader();
     }
     let x = mx + 2;
-    doc.text(fechaCorta(r.fecha), x, y);
+    doc.text(fechaCorta(reservation.fecha), x, y);
     x += cols[0].w;
-    doc.text(`${r.inicio} - ${r.fin} hs`, x, y);
+    doc.text(`${reservation.inicio} - ${reservation.fin} hs`, x, y);
     x += cols[1].w;
-    doc.text(act, x, y);
+    doc.text(activityLines, x, y);
     x += cols[2].w;
-    doc.text(ETIQ_SOL[r.estado], x, y);
+    doc.text(ETIQ_SOL[reservation.estado], x, y);
     doc.setDrawColor(210);
-    doc.line(mx, y + alto - 4, mx + 170, y + alto - 4);
-    y += alto;
+    doc.line(mx, y + rowHeight - 4, mx + 170, y + rowHeight - 4);
+    y += rowHeight;
   });
-  return { doc, nombre: `informe-reservas-${periodo}-${fecha}.pdf` };
+  return doc;
+}
+
+const reservationReportService = createReservationReportService({
+  render: renderReservationReportPdf,
+  clock: () => new Date(),
+});
+
+export function generarInforme(periodo, fecha, reservations) {
+  return reservationReportService.generate(periodo, fecha, reservations);
 }
 
 export function generarPDFNota(reservation) {
